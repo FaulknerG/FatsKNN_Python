@@ -13,7 +13,6 @@ CurPinT: 在当前目标表中的子样本节点
 RpCur: 当前目录表中节点p对应的Rp
 x: 待判别样本
 """
-from kmeans import PR_kmeans
 from numpy import *
 from sklearn.cluster import KMeans
 from sklearn import datasets
@@ -50,7 +49,7 @@ def PR_kmeans_gx(data, k):
 
 
 # 读取数据 iris数据
-data, data_target = load_data()
+data = load_data()
 row, col = data.shape
 # ========================================================
 # 首先进行聚类
@@ -91,6 +90,7 @@ for i in range(1, 4, 1):
 
 # ========================================================
 # 进行树搜索
+# x = [6.3, 3.4, 5.6, 2.4]
 x = [6, 6, 6, 6]
 B = 100000; CurL = 1; p = 0; TT = 1
 while TT == 1:
@@ -101,10 +101,14 @@ while TT == 1:
     RpCur = zeros((l, 1))  # 当前目录表中节点p对应的Rp
     # 当前节点的直接后继放入目录表, 并对这些节点计算D(x,Mp)
     for i in range(l):         # i: 0-2
-        Cur_p = i+p*l
+        if CurL == 1:
+            Cur_p = i
+        else:
+            Cur_p = i + (p+1) * 3
+        Cur_p = int(Cur_p)
         CurTable.append(Xp[Cur_p])
         CurPinT[i] = Cur_p
-        Dx[i] = sum(pow((x - Mp[Cur_p]), 2))  # 距离,没有开根号
+        Dx[i] = dist(x, Mp[Cur_p])
         RpCur[i] = Rp[Cur_p]
 
     while 1:
@@ -114,15 +118,15 @@ while TT == 1:
             if Dx[i] > B + RpCur[i]:
                 # 从当前目录表中去掉节点i
                 del(CurTable[i])
-                delete(CurPinT, i)
-                delete(Dx, i)
-                delete(RpCur, i)
+                CurPinT = delete(CurPinT, i)
+                Dx = delete(Dx, i)
+                RpCur = delete(RpCur, i)
                 break
         CurRowT = CurTable.__len__()
         # 如果目录表中已经没有节点了,则后退一个水平
         if CurRowT == 0:
             CurL -= 1
-            p = int((p-1)/3)
+            p = int(p/3) - 1
             # 如果L=0了，停止。======这是出口
             if CurL == 0:
                 TT = 0
@@ -131,47 +135,42 @@ while TT == 1:
                 # 转步骤3，
                 pass
         elif CurRowT > 0:
-            p1 = Dx[:, 0].argmin()
+            p1 = int(CurPinT[Dx.argmin()])
             p = p1
-            # 从当前目录表中去掉 p1
+            # if Dx.min() < B:
+            #     B = Dx.min()          # 书中没有的
+            #     print('B1: ', B)
+            # 选择最近的节点，从当前目录表中去掉 p1
             for j in range(CurRowT):
                 if CurPinT[j] == p1:
                     Xcurp[0] = CurTable[j]
                     del(CurTable[j])
-                    delete(CurPinT, j)
+                    CurPinT = delete(CurPinT, j)
                     CurD = Dx[j]  # 记录D(x,Mp)
-                    delete(Dx, j)
-                    delete(RpCur, j)
+                    Dx = delete(Dx, j)
+                    RpCur = delete(RpCur, j)
                     break
             # 如果当前水平L是最终水平,检验规则2
             if CurL == L:
-                pass
+                CurpRow = Xcurp[0].__len__()
+                CurpMean = Mp[p]
+                # 现在对p中对每个节点，检验规则2剪枝
+                for k in range(1, CurpRow):
+                    Dxi = dist(Xcurp[0][k], CurpMean)
+                    if CurD > Dxi + B:
+                        # xi 不是 x 的最近邻，不用计算D(x,xi)
+                        pass
+                    else:
+                        Dxxi = dist(x, Xcurp[0][k])
+                        if Dxxi < B:
+                            B = Dxxi
+                            print('B2: ', B)
+                            Xnn = Xcurp[0][k]
             else:
                 CurL += 1
                 break
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+print(B)
+print(Xnn)  # 最近邻
+for i in range(row):
+    if (data[i, :] == Xnn).all():
+        print(i)
